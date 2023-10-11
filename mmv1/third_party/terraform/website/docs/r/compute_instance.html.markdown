@@ -249,6 +249,8 @@ is desired, you will need to modify your state file manually using
 
 * `resource_manager_tags` - (Optional) A tag is a key-value pair that can be attached to a Google Cloud resource. You can use tags to conditionally allow or deny policies based on whether a resource has a specific tag. This value is not returned by the API. In Terraform, this value cannot be updated and changing it will recreate the resource.
 
+* `enable_confidential_compute` - (Optional) [Beta](https://terraform.io/docs/providers/google/guides/provider_versions.html) Indicates whether this disk is using confidential compute mode. Note: Currently only supported by hyperdisk skus, kms_key_self_link is required when setting to true.
+
 <a name="nested_scratch_disk"></a>The `scratch_disk` block supports:
 
 * `interface` - (Required) The disk interface to use for attaching this disk; either SCSI or NVME.

@@ -3290,6 +3290,24 @@ func testAccCheckComputeInstanceDisk(instance *compute.Instance, source string, 
 	}
 }
 
+<% if version =="beta"%>
+func testAccCheckComputeInstanceDiskConfidentialCompute(instance *compute.Instance, confidenitalCompute bool) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		if instance.Disks == nil {
+			return fmt.Errorf("no disks")
+		}
+
+		for _, disk := range instance.Disks {
+			if disk.InitializeParams.EnableConfidentialCompute == confidenitalCompute {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("No disk found with confidentialCompute: %t", confidenitalCompute)
+	}
+}
+<% end %>
+
 func testAccCheckComputeInstanceHasInstanceId(instance *compute.Instance, n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
@@ -8368,3 +8386,68 @@ resource "google_compute_instance" "foobar" {
 }
 <% end %>
 
+<% if version == "beta"%>
+func testAccComputeInstance_createOnCreate_bootConfidentialHyperdisk(bootEncryptionKey string, instance string) string {
+	return fmt.Sprintf(`
+data "google_compute_image" "my_image" {
+  family  = "debian-11"
+  project = "debian-cloud"
+}
+
+resource "google_compute_instance" "foobar" {
+  name         = "%s"
+  machine_type = "n2-standard-80"
+  zone         = "us-central1-a"
+  desired_status  = "RUNNING"
+
+  boot_disk {
+    initialize_params {
+      image = data.google_compute_image.my_image.self_link
+	  enable_confidential_compute = true
+	  type = "hyperdisk-extreme"
+    }
+    kms_key_self_link = "%s"
+  }
+
+  network_interface {
+    network = "default"
+  }
+
+  metadata = {
+    foo = "bar"
+  }
+}
+`, instance, bootEncryptionKey)
+}
+
+func TestAccComputeInstance_createOnCreate_bootConfidentialHyperdisk(t *testing.T) {
+	t.Parallel()
+
+	var instance compute.Instance
+	var instanceName = fmt.Sprintf("tf-test-%s", acctest.RandString(t, 10))
+	kms := acctest.BootstrapKMSKeyInLocation(t, "us-central1")
+
+	bootKmsKeyName := kms.CryptoKey.Name
+
+	if acctest.BootstrapPSARole(t, "service-", "compute-system", "roles/cloudkms.cryptoKeyEncrypterDecrypter") {
+		t.Fatal("Stopping the test because a role was added to the policy.")
+	}
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:     func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy: testAccCheckComputeInstanceDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccComputeInstance_createOnCreate_bootConfidentialHyperdisk(bootKmsKeyName, instanceName),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckComputeInstanceExists(t, "google_compute_instance.foobar", &instance),
+					testAccCheckComputeInstanceDisk(&instance, instanceName, true, true),
+					testAccCheckComputeInstanceDiskConfidentialCompute(&instance, true),
+				),
+			},
+			computeInstanceImportStep("us-central1-a", instanceName, []string{}),
+		},
+	})
+}
+<% end %>

@@ -206,6 +206,15 @@ properties:
                     customer-supplied encryption key that protects this
                     resource.
                   output: true
+            - !ruby/object:Api::Type::Boolean
+              name: 'enableConfidentialCompute'
+              description: |
+                Indicates whether this disk is using confidential compute mode.
+                Note: Currently only supported by hyperdisk skus,
+                kms_key_self_link is required when setting to true.
+              required: false
+              min_version: beta
+              default_from_api: true
         - !ruby/object:Api::Type::Enum
           name: 'interface'
           description: |
